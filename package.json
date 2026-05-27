@@ -1,0 +1,171 @@
+{
+  "name": "xiaomi-mimo-copilot-chat",
+  "displayName": "Xiaomi MiMo Copilot Chat",
+  "description": "Bring your own MiMo API key to VS Code Copilot Chat. Adds Xiaomi MiMo models through the Language Model Chat Provider API.",
+  "version": "0.1.0",
+  "publisher": "ltmoerdani",
+  "preview": true,
+  "license": "MIT",
+  "icon": "media/mimo.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "keywords": [
+    "mimo",
+    "xiaomi",
+    "copilot",
+    "byok",
+    "ai",
+    "language model",
+    "openai",
+    "llm",
+    "chat",
+    "xiaomi-mimo",
+    "mimo-v2.5",
+    "copilot-chat",
+    "vscode-extension",
+    "gpt-alternative",
+    "claude-alternative",
+    "free-ai",
+    "api-key",
+    "chat-completions",
+    "code-assistant",
+    "programming",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ltmoerdani/xiaomi-mimo-copilot-chat.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ltmoerdani/xiaomi-mimo-copilot-chat/issues"
+  },
+  "homepage": "https://github.com/ltmoerdani/xiaomi-mimo-copilot-chat#readme",
+  "engines": {
+    "vscode": "^1.118.0"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onCommand:xiaomi-mimo.manage",
+    "onCommand:xiaomi-mimo.diagnostics",
+    "onCommand:xiaomi-mimo.setApiKey",
+    "onCommand:xiaomi-mimo.modelPickerDiagnostics",
+    "onLanguageModelChatProvider:xiaomi-mimo"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "xiaomi-mimo.manage",
+        "title": "MiMo: Manage Provider"
+      },
+      {
+        "command": "xiaomi-mimo.setApiKey",
+        "title": "MiMo: Set API Key"
+      },
+      {
+        "command": "xiaomi-mimo.diagnostics",
+        "title": "MiMo: Diagnostics"
+      },
+      {
+        "command": "xiaomi-mimo.modelPickerDiagnostics",
+        "title": "MiMo: Model Picker Diagnostics"
+      }
+    ],
+    "configuration": {
+      "title": "MiMo",
+      "properties": {
+        "xiaomi-mimo.temperature": {
+          "type": "number",
+          "default": 0.2,
+          "minimum": 0,
+          "maximum": 2,
+          "description": "Sampling temperature used for chat completions."
+        },
+        "xiaomi-mimo.maxTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Optional max output token override. Use 0 to request each MiMo model's configured maximum."
+        },
+        "xiaomi-mimo.maxInputTokens": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "description": "Optional context size override advertised to VS Code. Use 0 to advertise each MiMo model's configured context window."
+        },
+        "xiaomi-mimo.debugReasoning": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write provider reasoning_content to the MiMo output channel for debugging. Reasoning is not shown in Copilot Chat."
+        },
+        "xiaomi-mimo.requestTimeoutSeconds": {
+          "type": "number",
+          "default": 600,
+          "minimum": 1,
+          "description": "Total request timeout in seconds for MiMo chat requests. Prevents long-running Copilot requests from hanging indefinitely."
+        },
+        "xiaomi-mimo.streamIdleTimeoutSeconds": {
+          "type": "number",
+          "default": 120,
+          "minimum": 1,
+          "description": "Streaming idle timeout in seconds. If MiMo stops sending response chunks for this long, the request is cancelled with a clear error."
+        },
+        "xiaomi-mimo.showUsageStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the latest MiMo prompt/output/cache usage summary in the VS Code status bar after each response."
+        },
+        "xiaomi-mimo.experimentalContextIndicator": {
+          "type": "boolean",
+          "default": false,
+          "description": "Experimental: attempt to inject real token usage into the Copilot Chat context indicator using VS Code internals. May break on VS Code updates."
+        },
+        "xiaomi-mimo.freeOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, only free MiMo models are shown in the Copilot model selector."
+        }
+      }
+    },
+    "languageModelChatProviders": [
+      {
+        "vendor": "xiaomi-mimo",
+        "displayName": "MiMo (Xiaomi)",
+        "configuration": {
+          "type": "object",
+          "required": [
+            "apiKey"
+          ],
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "title": "MiMo API Key",
+              "description": "Enter your Xiaomi MiMo API key.",
+              "secret": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "npm run compile && node --test",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@types/vscode": "^1.118.0",
+    "@vscode/vsce": "^3.6.0",
+    "typescript": "^5.9.3"
+  }
+}

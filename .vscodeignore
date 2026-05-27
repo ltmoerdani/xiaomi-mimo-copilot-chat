@@ -1,0 +1,13 @@
+.gitignore
+.vscode/**
+.vscode-test/**
+.github/**
+node_modules/**
+src/**
+*.vsix
+tsconfig.json
+package-lock.json
+media/opencodego.svg
+media/social-preview.svg
+CONTRIBUTING.md
+SECURITY.md

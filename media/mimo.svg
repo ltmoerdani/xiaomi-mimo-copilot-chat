@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FF6B35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F7931E;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="chatGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFFFFF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FFF5EB;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#00000030"/>
+    </filter>
+  </defs>
+  
+  <!-- Background rounded square -->
+  <rect x="4" y="4" width="120" height="120" rx="28" ry="28" fill="url(#bg)" filter="url(#shadow)"/>
+  
+  <!-- Chat bubble main -->
+  <path d="M30 38 Q30 28 40 28 L88 28 Q98 28 98 38 L98 72 Q98 82 88 82 L58 82 L46 96 L46 82 L40 82 Q30 82 30 72 Z" 
+        fill="url(#chatGrad)" opacity="0.95"/>
+  
+  <!-- MiMo text - stylized -->
+  <text x="64" y="64" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" 
+        font-size="26" font-weight="800" fill="#FF6B35" letter-spacing="-1">
+    <tspan>MI</tspan><tspan fill="#F7931E">MO</tspan>
+  </text>
+  
+  <!-- Sparkle dots representing AI -->
+  <circle cx="108" cy="24" r="6" fill="#FFE066" opacity="0.9"/>
+  <circle cx="116" cy="36" r="3.5" fill="#FFE066" opacity="0.7"/>
+  <circle cx="100" cy="16" r="3" fill="#FFE066" opacity="0.6"/>
+  
+  <!-- Small signal waves from sparkle -->
+  <path d="M112 18 Q118 14 116 8" stroke="#FFE066" stroke-width="1.5" fill="none" opacity="0.5"/>
+  <path d="M116 22 Q124 16 122 6" stroke="#FFE066" stroke-width="1.5" fill="none" opacity="0.3"/>
+</svg>

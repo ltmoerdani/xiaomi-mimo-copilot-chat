@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0d1117"/>
+      <stop offset="100%" style="stop-color:#161b22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF6B35"/>
+      <stop offset="100%" style="stop-color:#FF9F1C"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Decorative grid -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#21262d" stroke-width="0.5"/>
+  </pattern>
+  <rect width="1280" height="640" fill="url(#grid)" opacity="0.5"/>
+
+  <!-- Glow circle -->
+  <circle cx="640" cy="320" r="250" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.15"/>
+  <circle cx="640" cy="320" r="180" fill="none" stroke="url(#accent)" stroke-width="1" opacity="0.1"/>
+
+  <!-- MiMo icon (stylized "M") -->
+  <text x="640" y="260" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="120" font-weight="800" fill="url(#accent)">M</text>
+
+  <!-- Title -->
+  <text x="640" y="340" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="700" fill="#e6edf3">MiMo Copilot Chat</text>
+
+  <!-- Subtitle -->
+  <text x="640" y="390" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="24" fill="#8b949e">BYOK Xiaomi MiMo AI models in GitHub Copilot Chat</text>
+
+  <!-- Badge row -->
+  <rect x="340" y="430" rx="20" ry="20" width="120" height="36" fill="#238636" opacity="0.9"/>
+  <text x="400" y="454" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#ffffff">Free</text>
+
+  <rect x="480" y="430" rx="20" ry="20" width="160" height="36" fill="#1f6feb" opacity="0.9"/>
+  <text x="560" y="454" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#ffffff">VS Code Extension</text>
+
+  <rect x="660" y="430" rx="20" ry="20" width="140" height="36" fill="#8957e5" opacity="0.9"/>
+  <text x="730" y="454" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="#ffffff">MIT Licensed</text>
+
+  <!-- Bottom branding -->
+  <text x="640" y="580" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" fill="#484f58">github.com/ltmoerdani/mimo-copilot-chat</text>
+</svg>

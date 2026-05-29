@@ -4,6 +4,14 @@ All notable changes to the **Xiaomi MiMo Copilot Chat** extension are documented
 
 Forked from [opencode-copilot-chat](https://github.com/ltmoerdani/opencode-copilot-chat).
 
+## Unreleased
+
+### Fixed
+
+- Corrected MiMo model IDs to Xiaomi's lowercase API identifiers and filtered the live model list to chat-capable MiMo models.
+- Reused the SecretStorage API key when VS Code does not pass provider configuration into model discovery or chat requests.
+- Quieted routine request/model metadata output by default behind the `xiaomi-mimo.debugLogging` setting.
+
 ## [0.1.0] — 2026-05-27
 
 ### Added

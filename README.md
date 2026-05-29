@@ -26,7 +26,7 @@
 
 | Provider | Cost | Example Models |
 |---|---|---|
-| **MiMo** | Paid (token plan) | MiMo-V2.5, MiMo-V2.5-Pro |
+| **MiMo** | Paid (token plan) | `mimo-v2.5`, `mimo-v2.5-pro` |
 
 ---
 
@@ -93,6 +93,7 @@ For advanced usage, you can also run these commands via the Command Palette (`Cm
 | `xiaomi-mimo.maxInputTokens` | `number` | `0` | Context window override — `0` uses the per-model bundled context size |
 | `xiaomi-mimo.requestTimeoutSeconds` | `number` | `600` | Total request timeout for MiMo API calls |
 | `xiaomi-mimo.streamIdleTimeoutSeconds` | `number` | `120` | Cancels a request if the response stream stops sending chunks for too long |
+| `xiaomi-mimo.debugLogging` | `boolean` | `false` | Write verbose transport and model registration diagnostics to the MiMo output channel |
 | `xiaomi-mimo.showUsageStatusBar` | `boolean` | `true` | Show the latest MiMo usage summary in the VS Code status bar |
 
 ---

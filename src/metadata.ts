@@ -70,7 +70,7 @@ export interface ModelsDevResponse {
 }
 
 export const MODELS_DEV_API_URL = "https://models.dev/api.json";
-export const MODEL_METADATA_REVISION = "session-2026-05-27-mimo";
+export const MODEL_METADATA_REVISION = "session-2026-05-29-mimo";
 export const MODEL_METADATA_CACHE_KEY = "xiaomi-mimo.modelMetadataCache.v1";
 export const MODEL_METADATA_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
@@ -85,8 +85,8 @@ const MODELS_DEV_PROVIDER_BY_VENDOR: Record<ProviderVendor, keyof ModelsDevRespo
 
 const MODEL_LIMITS_BY_PROVIDER: Record<ProviderVendor, Record<string, BaseModelLimits>> = {
   [MIMO_VENDOR]: {
-    "MiMo-V2.5": { contextWindow: 131072, maxOutputTokens: 8192 },
-    "MiMo-V2.5-Pro": { contextWindow: 131072, maxOutputTokens: 8192 },
+    "mimo-v2.5": { contextWindow: 1000000, maxOutputTokens: 128000 },
+    "mimo-v2.5-pro": { contextWindow: 1048576, maxOutputTokens: 128000 },
   },
 };
 

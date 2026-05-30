@@ -180,6 +180,7 @@ export async function streamGoogleGenerateContent(
 interface StreamMiMoResponseOptions extends StreamRequestOptions {
   extractStreamParts: (data: unknown) => vscode.LanguageModelResponsePart[];
   extractFullParts: (data: unknown) => vscode.LanguageModelResponsePart[];
+  maxRetries?: number;
 }
 
 interface RequestUsageSummary {
@@ -203,8 +204,69 @@ function reportProgressPart(
   reportProgressWithContextWindowRequest(localRequestId, progress, part);
 }
 
+// Phase 1: Connection timeout — how long we wait for the initial HTTP response.
+// This is separate from the overall request timeout to fail fast on unreachable servers.
+const CONNECTION_TIMEOUT_MS = 60_000; // 1 minute for initial connection/TTFB
+const MAX_RETRIES = 1; // One automatic retry on transient connection failures
+
 async function streamMiMoResponse(
   options: StreamMiMoResponseOptions,
+): Promise<void> {
+  const maxAttempts = (options.maxRetries ?? MAX_RETRIES) + 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (options.token.isCancellationRequested) {
+      return;
+    }
+
+    try {
+      await streamMiMoResponseAttempt(options, attempt);
+      return;
+    } catch (error) {
+      lastError = error;
+      // Only retry on connection-level transient errors, not on timeouts or cancellations
+      if (
+        attempt < maxAttempts - 1
+        && isTransientConnectionError(error)
+        && !options.token.isCancellationRequested
+      ) {
+        const delayMs = 1000 * (attempt + 1); // linear backoff: 1s, 2s, ...
+        options.output?.appendLine(
+          `[retry] attempt ${attempt + 1}/${maxAttempts} failed with transient error, retrying in ${delayMs}ms: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError;
+}
+
+function isTransientConnectionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  // Network-level errors that are worth retrying
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("econnrefused")
+    || message.includes("econnreset")
+    || message.includes("enotfound")
+    || message.includes("etimedout")
+    || message.includes("socket hang up")
+    || message.includes("network error")
+    || message.includes("fetch failed")
+    || message.includes("und_err_connect")
+    || (error instanceof TypeError && message.includes("fetch"))
+  );
+}
+
+async function streamMiMoResponseAttempt(
+  options: StreamMiMoResponseOptions,
+  attempt: number,
 ): Promise<void> {
   const controller = new AbortController();
   const startedAt = Date.now();
@@ -226,6 +288,17 @@ async function streamMiMoResponse(
   const cancellation = options.token.onCancellationRequested(() =>
     abort("cancelled"),
   );
+  // Phase 1: Connection timeout — abort if the server doesn't respond within this window.
+  // This prevents waiting 10 minutes for a dead/unreachable server.
+  const connectionTimeout = setTimeout(
+    () => {
+      if (firstByteAt === undefined) {
+        abort("request-timeout");
+      }
+    },
+    Math.min(CONNECTION_TIMEOUT_MS, options.requestTimeoutMs),
+  );
+  // Phase 2: Overall request timeout — hard ceiling for the entire request lifecycle.
   const requestTimeout = setTimeout(
     () => abort("request-timeout"),
     options.requestTimeoutMs,
@@ -335,8 +408,9 @@ async function streamMiMoResponse(
 
     const payload = JSON.stringify(options.body);
     if (options.debugTransport) {
+      const attemptLabel = attempt > 0 ? ` attempt=${attempt + 1}` : "";
       options.output?.appendLine(
-        `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs}`,
+        `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs} connectionTimeoutMs=${CONNECTION_TIMEOUT_MS}${attemptLabel}`,
       );
     }
     const response = await fetch(options.url, {
@@ -352,6 +426,10 @@ async function streamMiMoResponse(
 
     responseStatus = response.status;
     responseContentType = response.headers.get("content-type") ?? "";
+    // Connection succeeded — clear the connection-phase timeout so only the
+    // overall request timeout and stream idle timeout remain active.
+    clearTimeout(connectionTimeout);
+    firstByteAt ??= Date.now();
     if (options.debugTransport) {
       options.output?.appendLine(
         `[http] ${response.status} ${response.statusText} content-type=${responseContentType || "<none>"}`,
@@ -485,9 +563,13 @@ async function streamMiMoResponse(
       return;
     }
     if (abortReason === "request-timeout") {
+      const elapsed = Date.now() - startedAt;
+      const phase = firstByteAt === undefined ? "connection" : "streaming";
       const requestError = new MiMoRequestError(
-        `${options.providerDisplayName} request timed out after ${formatDuration(options.requestTimeoutMs)}.`,
-        `${options.providerDisplayName} did not start or finish the request within ${formatDuration(options.requestTimeoutMs)}. Try again later or reduce the request size.`,
+        `${options.providerDisplayName} request timed out after ${formatDuration(elapsed)} (during ${phase} phase).`,
+        firstByteAt === undefined
+          ? `${options.providerDisplayName} did not respond within ${formatDuration(CONNECTION_TIMEOUT_MS)}. The server may be temporarily unavailable. Try again in a moment or switch to a different model.`
+          : `${options.providerDisplayName} started responding but timed out after ${formatDuration(options.requestTimeoutMs)}. Try again later or reduce the request size.`,
       );
       emitSummary(0, 0, {
         abortedReason: "request-timeout",
@@ -511,6 +593,7 @@ async function streamMiMoResponse(
     });
     throw error;
   } finally {
+    clearTimeout(connectionTimeout);
     clearTimeout(requestTimeout);
     if (streamIdleTimeout) {
       clearTimeout(streamIdleTimeout);

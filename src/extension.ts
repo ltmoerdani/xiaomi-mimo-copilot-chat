@@ -68,8 +68,8 @@ type ModelEndpointKind =
 
 const FREE_ZEN_MODEL_IDS = new Set<string>([]);
 const KNOWN_UNAVAILABLE_MODEL_IDS = new Set<string>([]);
-const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
-const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
+const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 90 * 1000;
 const MIMO_CLIENT = "vscode-copilot-chat";
 const MIMO_USER_AGENT = "xiaomi-mimo-copilot-chat/0.1.0 VSCode";
 

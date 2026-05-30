@@ -1,4 +1,4 @@
-# 🚀 Xiaomi MiMo Copilot Chat
+# 🚀 Xiaomi MiMo GitHub Copilot Chat
 
 > **Use [MiMo](https://xiaomimimo.com) AI models directly in GitHub Copilot Chat — no Copilot Pro/Enterprise subscription needed. Just bring your own API key (BYOK).**
 
@@ -14,9 +14,9 @@
 
 ## 💡 What Is This?
 
-**Xiaomi MiMo Copilot Chat** is a free, open-source VS Code extension that brings [Xiaomi MiMo](https://xiaomimimo.com) AI models into **GitHub Copilot Chat** via the official VS Code *Language Model Chat Provider API*.
+**Xiaomi MiMo GitHub Copilot Chat** is a free, open-source VS Code extension that brings [Xiaomi MiMo](https://xiaomimimo.com) AI models into **GitHub Copilot Chat** via the official VS Code *Language Model Chat Provider API*.
 
-### Why Xiaomi MiMo Copilot Chat?
+### Why Xiaomi MiMo GitHub Copilot Chat?
 
 - 🔑 **No Copilot Pro/Enterprise needed** — just sign in with a free GitHub account
 - 💰 **BYOK (Bring Your Own Key)** — pay only for what you use on Xiaomi's token plan

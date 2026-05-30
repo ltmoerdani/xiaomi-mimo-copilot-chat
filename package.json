@@ -1,8 +1,8 @@
 {
   "name": "xiaomi-mimo-copilot-chat",
-  "displayName": "Xiaomi MiMo Copilot Chat",
+  "displayName": "Xiaomi MiMo GitHub Copilot Chat",
   "description": "Bring your own MiMo API key to VS Code Copilot Chat. Adds Xiaomi MiMo models through the Language Model Chat Provider API.",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "publisher": "ltmoerdani",
   "preview": true,
   "license": "MIT",
@@ -113,15 +113,15 @@
         },
         "xiaomi-mimo.requestTimeoutSeconds": {
           "type": "number",
-          "default": 600,
-          "minimum": 1,
-          "description": "Total request timeout in seconds for MiMo chat requests. Prevents long-running Copilot requests from hanging indefinitely."
+          "default": 300,
+          "minimum": 30,
+          "description": "Total request timeout in seconds for MiMo chat requests. The connection phase has a separate 60s timeout. Default reduced to 5 minutes since MiMo is a fast API."
         },
         "xiaomi-mimo.streamIdleTimeoutSeconds": {
           "type": "number",
-          "default": 120,
-          "minimum": 1,
-          "description": "Streaming idle timeout in seconds. If MiMo stops sending response chunks for this long, the request is cancelled with a clear error."
+          "default": 90,
+          "minimum": 10,
+          "description": "Streaming idle timeout in seconds. If MiMo stops sending response chunks for this long, the request is cancelled. Default 90 seconds."
         },
         "xiaomi-mimo.showUsageStatusBar": {
           "type": "boolean",

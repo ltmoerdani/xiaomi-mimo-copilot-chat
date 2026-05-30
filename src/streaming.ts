@@ -33,6 +33,7 @@ export interface StreamRequestOptions {
   token: vscode.CancellationToken;
   output?: vscode.OutputChannel;
   debugReasoning: boolean;
+  debugTransport: boolean;
   requestTimeoutMs: number;
   streamIdleTimeoutMs: number;
   contextWindowOutputBuffer?: number;
@@ -83,9 +84,11 @@ export async function streamChatCompletions(
     options.progress,
     options.requestHeaders["x-mimo-request"],
   );
-  options.output?.appendLine(
-    `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
-  );
+  if (options.debugTransport) {
+    options.output?.appendLine(
+      `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
+    );
+  }
   if (extractor.emittedText === 0 && extractor.emittedTools === 0) {
     options.output?.appendLine(
       `[warn] empty response from model=${options.modelId} (no text, no tool calls, no reasoning).`,
@@ -112,9 +115,11 @@ export async function streamAnthropicMessages(
     options.progress,
     options.requestHeaders["x-mimo-request"],
   );
-  options.output?.appendLine(
-    `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
-  );
+  if (options.debugTransport) {
+    options.output?.appendLine(
+      `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
+    );
+  }
 }
 
 export async function streamResponsesApi(
@@ -137,9 +142,11 @@ export async function streamResponsesApi(
     options.progress,
     options.requestHeaders["x-mimo-request"],
   );
-  options.output?.appendLine(
-    `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
-  );
+  if (options.debugTransport) {
+    options.output?.appendLine(
+      `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
+    );
+  }
 }
 
 export async function streamGoogleGenerateContent(
@@ -163,9 +170,11 @@ export async function streamGoogleGenerateContent(
     options.progress,
     options.requestHeaders["x-mimo-request"],
   );
-  options.output?.appendLine(
-    `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
-  );
+  if (options.debugTransport) {
+    options.output?.appendLine(
+      `[stream-summary model=${options.modelId}] textChars=${extractor.emittedText} toolCalls=${extractor.emittedTools} reasoningChars=${extractor.reasoningChars}`,
+    );
+  }
 }
 
 interface StreamMiMoResponseOptions extends StreamRequestOptions {
@@ -274,9 +283,11 @@ async function streamMiMoResponse(
       ...extra,
     };
 
-    options.output?.appendLine(
-      `[response-summary] status=${summary.status ?? "n/a"} durationMs=${summary.durationMs} ttfbMs=${summary.ttfbMs ?? "n/a"} promptTokens=${summary.promptTokens ?? "n/a"} completionTokens=${summary.completionTokens ?? "n/a"} totalTokens=${summary.totalTokens ?? "n/a"} cachedTokens=${summary.cachedTokens ?? "n/a"} finishReason=${summary.finishReason ?? "<unknown>"} totalBytes=${summary.totalBytes} totalEvents=${summary.totalEvents}`,
-    );
+    if (options.debugTransport) {
+      options.output?.appendLine(
+        `[response-summary] status=${summary.status ?? "n/a"} durationMs=${summary.durationMs} ttfbMs=${summary.ttfbMs ?? "n/a"} promptTokens=${summary.promptTokens ?? "n/a"} completionTokens=${summary.completionTokens ?? "n/a"} totalTokens=${summary.totalTokens ?? "n/a"} cachedTokens=${summary.cachedTokens ?? "n/a"} finishReason=${summary.finishReason ?? "<unknown>"} totalBytes=${summary.totalBytes} totalEvents=${summary.totalEvents}`,
+      );
+    }
     const usageLog = formatUsageLogLine({
       promptTokens: summary.promptTokens,
       completionTokens: summary.completionTokens,
@@ -284,7 +295,7 @@ async function streamMiMoResponse(
       cachedTokens: summary.cachedTokens,
       finishReason: summary.finishReason,
     });
-    if (usageLog) {
+    if (options.debugTransport && usageLog) {
       options.output?.appendLine(`[usage] ${usageLog}`);
     }
     options.onTransportSummary?.(summary);
@@ -323,9 +334,11 @@ async function streamMiMoResponse(
     }
 
     const payload = JSON.stringify(options.body);
-    options.output?.appendLine(
-      `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs}`,
-    );
+    if (options.debugTransport) {
+      options.output?.appendLine(
+        `[request] url=${options.url} payloadBytes=${payload.length} requestTimeoutMs=${options.requestTimeoutMs} streamIdleTimeoutMs=${options.streamIdleTimeoutMs}`,
+      );
+    }
     const response = await fetch(options.url, {
       method: "POST",
       headers: {
@@ -339,21 +352,25 @@ async function streamMiMoResponse(
 
     responseStatus = response.status;
     responseContentType = response.headers.get("content-type") ?? "";
-    options.output?.appendLine(
-      `[http] ${response.status} ${response.statusText} content-type=${responseContentType || "<none>"}`,
-    );
+    if (options.debugTransport) {
+      options.output?.appendLine(
+        `[http] ${response.status} ${response.statusText} content-type=${responseContentType || "<none>"}`,
+      );
+    }
     const rateLimitSummary = formatRateLimitSummary(
       readRateLimitInfo(response.headers),
     );
-    if (rateLimitSummary) {
+    if (options.debugTransport && rateLimitSummary) {
       options.output?.appendLine(`[rate-limit] ${rateLimitSummary}`);
     }
 
     if (!response.ok) {
       const detail = await response.text();
-      options.output?.appendLine(
-        `[http-error-body] ${detail.trim() ? truncateForLog(detail) : "<empty>"}`,
-      );
+      if (options.debugTransport) {
+        options.output?.appendLine(
+          `[http-error-body] ${detail.trim() ? truncateForLog(detail) : "<empty>"}`,
+        );
+      }
       const capacityHint =
         options.capacityLimitedModelNotes?.[options.modelId] && response.status >= 500
           ? ` — ${options.capacityLimitedModelNotes[options.modelId]}`
@@ -376,7 +393,9 @@ async function streamMiMoResponse(
     if (!response.body || !responseContentType.includes("text/event-stream")) {
       const raw = await response.text();
       firstByteAt ??= Date.now();
-      options.output?.appendLine(`[non-stream-body] ${truncateForLog(raw)}`);
+      if (options.debugTransport) {
+        options.output?.appendLine(`[non-stream-body] ${truncateForLog(raw)}`);
+      }
       let data: unknown;
       try {
         data = JSON.parse(raw);
@@ -451,9 +470,11 @@ async function streamMiMoResponse(
       }
     }
 
-    options.output?.appendLine(
-      `[sse-stats] totalBytes=${totalBytes} totalEvents=${totalEvents} bufferTailLen=${buffer.length}`,
-    );
+    if (options.debugTransport) {
+      options.output?.appendLine(
+        `[sse-stats] totalBytes=${totalBytes} totalEvents=${totalEvents} bufferTailLen=${buffer.length}`,
+      );
+    }
     emitSummary(totalBytes, totalEvents, { rateLimitSummary });
   } catch (error) {
     if (abortReason === "cancelled") {

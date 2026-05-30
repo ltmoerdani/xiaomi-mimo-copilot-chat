@@ -75,6 +75,14 @@ const MIMO_USER_AGENT = "xiaomi-mimo-copilot-chat/0.1.0 VSCode";
 
 const MIMO_BASE_URL = "https://token-plan-sgp.xiaomimimo.com/v1";
 
+function isSupportedMiMoChatModel(modelId: string): boolean {
+  const normalized = modelId.toLowerCase();
+  return normalized.startsWith("mimo-")
+    && !normalized.includes("tts")
+    && !normalized.includes("voiceclone")
+    && !normalized.includes("voicedesign");
+}
+
 const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition> = {
   [MIMO_VENDOR]: {
     vendor: MIMO_VENDOR,
@@ -84,11 +92,12 @@ const PROVIDERS: Record<ProviderDefinition["vendor"], ProviderDefinition> = {
     chatCompletionsUrl: `${MIMO_BASE_URL}/chat/completions`,
     messagesUrl: `${MIMO_BASE_URL}/chat/completions`,
     categoryOrder: 2,
-    testModelId: "MiMo-V2.5",
+    testModelId: "mimo-v2.5-pro",
     fallbackModels: [
-      "MiMo-V2.5",
-      "MiMo-V2.5-Pro",
-    ]
+      "mimo-v2.5",
+      "mimo-v2.5-pro",
+    ],
+    filterModel: isSupportedMiMoChatModel,
   }
 };
 
@@ -177,6 +186,7 @@ interface ApiSettings {
   maxOutputTokensOverride: number;
   maxInputTokensOverride: number;
   debugReasoning: boolean;
+  debugLogging: boolean;
   requestTimeoutMs: number;
   streamIdleTimeoutMs: number;
   thinking: ThinkingSettings;
@@ -566,8 +576,17 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
     this.getOutputChannel().appendLine(`[${new Date().toISOString()}] ${message}`);
   }
 
+  private debugLog(message: string): void {
+    if (getSettings().debugLogging) {
+      this.log(message);
+    }
+  }
+
   private async getMetadataSnapshot(): Promise<CachedModelMetadataSnapshot> {
-    return getMiMoModelMetadata(this.context, this.getOutputChannel());
+    return getMiMoModelMetadata(
+      this.context,
+      getSettings().debugLogging ? this.getOutputChannel() : undefined,
+    );
   }
 
   private resolveModelMetadata(
@@ -859,7 +878,9 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
     options: vscode.PrepareLanguageModelChatModelOptions,
     token: vscode.CancellationToken
   ): Promise<MiMoModel[]> {
-    const apiKey = getConfiguredApiKey(options as ConfiguredLanguageModelInfoOptions);
+    const apiKey =
+      getConfiguredApiKey(options as ConfiguredLanguageModelInfoOptions)
+      ?? await this.context.secrets.get(SECRET_KEY);
 
     if (!apiKey) {
       return [];
@@ -911,7 +932,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
         ...(configurationSchema ? { configurationSchema } : {})
       };
 
-      this.log(`Model registered: id=${info.id} family=${info.family} metadataSource=${metadata.source} endpointKind=${routing.endpointKind} endpointUrl=${routing.endpointUrl} configurationSchema=${configurationSchema ? JSON.stringify(configurationSchema) : "none"}`);
+      this.debugLog(`Model registered: id=${info.id} family=${info.family} metadataSource=${metadata.source} endpointKind=${routing.endpointKind} endpointUrl=${routing.endpointUrl} configurationSchema=${configurationSchema ? JSON.stringify(configurationSchema) : "none"}`);
 
       return info;
     });
@@ -926,7 +947,8 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
   ): Promise<void> {
     const apiKey =
       getConfiguredApiKey(options as ConfiguredLanguageModelResponseOptions)
-      ?? this.apiKeysByModelId.get(model.id);
+      ?? this.apiKeysByModelId.get(model.id)
+      ?? await this.context.secrets.get(SECRET_KEY);
 
     if (!apiKey) {
       throw new Error(`${this.definition.displayName} API key is required. Use the ${this.definition.displayName} gear icon in Language Models to configure it, then reload the window.`);
@@ -954,7 +976,10 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
       options,
       rawModelId,
     );
-    const outputChannel = this.getOutputChannel();
+    const outputChannel =
+      settings.debugLogging || settings.debugReasoning
+        ? this.getOutputChannel()
+        : undefined;
     const onTransportSummary = (summary: TransportRequestSummary) => {
       this.recordTransportSummary(
         summary,
@@ -965,7 +990,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
       updateUsageStatusBar(this.definition.displayName, rawModelId, summary);
     };
 
-    this.log(`Request: initiator=${options.requestInitiator} model=${model.id} rawModel=${rawModelId} endpoint=${routing.endpointKind} metadataSource=${metadata.source} messages=${apiMessages.length} session=${requestHeaders["x-mimo-session"]} request=${requestHeaders["x-mimo-request"]} modelConfiguration=${JSON.stringify(pickThinkingModelConfiguration(requestOverride))} thinking=${JSON.stringify(settings.thinking)} thinkingPayload=${JSON.stringify(thinkingPayload)}`);
+    this.debugLog(`Request: initiator=${options.requestInitiator} model=${model.id} rawModel=${rawModelId} endpoint=${routing.endpointKind} metadataSource=${metadata.source} messages=${apiMessages.length} session=${requestHeaders["x-mimo-session"]} request=${requestHeaders["x-mimo-request"]} modelConfiguration=${JSON.stringify(pickThinkingModelConfiguration(requestOverride))} thinking=${JSON.stringify(settings.thinking)} thinkingPayload=${JSON.stringify(thinkingPayload)}`);
     if (settings.debugReasoning) {
       this.log("Reasoning debug is enabled. Provider reasoning_content will be written to this output channel when available.");
     }
@@ -985,6 +1010,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
           token,
           output: outputChannel,
           debugReasoning: settings.debugReasoning,
+          debugTransport: settings.debugLogging,
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
@@ -1008,6 +1034,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
           token,
           output: outputChannel,
           debugReasoning: settings.debugReasoning,
+          debugTransport: settings.debugLogging,
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
@@ -1019,7 +1046,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
           }
           }
         });
-        this.log(`Request completed: model=${model.id}`);
+        this.debugLog(`Request completed: model=${model.id}`);
         return;
       }
 
@@ -1035,6 +1062,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
           token,
           output: outputChannel,
           debugReasoning: settings.debugReasoning,
+          debugTransport: settings.debugLogging,
           requestTimeoutMs: settings.requestTimeoutMs,
           streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
           contextWindowOutputBuffer,
@@ -1062,6 +1090,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
         token,
         output: outputChannel,
         debugReasoning: settings.debugReasoning,
+        debugTransport: settings.debugLogging,
         requestTimeoutMs: settings.requestTimeoutMs,
         streamIdleTimeoutMs: settings.streamIdleTimeoutMs,
         contextWindowOutputBuffer,
@@ -1073,7 +1102,7 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
           }
         }
       });
-      this.log(`Request completed: model=${model.id}`);
+      this.debugLog(`Request completed: model=${model.id}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.log(`ERROR model=${model.id}: ${message}`);
@@ -1136,13 +1165,13 @@ class MiMoProvider implements vscode.LanguageModelChatProvider<MiMoModel> {
 
       const removedModelIds = uniqueModelIds.filter((modelId) => !filteredModelIds.includes(modelId));
       if (removedModelIds.length) {
-        this.log(`Filtered unavailable/deprecated models: ${removedModelIds.join(", ")}`);
+        this.debugLog(`Filtered unavailable/deprecated models: ${removedModelIds.join(", ")}`);
       }
 
       return filteredModelIds;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      this.log(`Could not fetch model status metadata from models.dev. Applying local unavailable model filter only. ${message}`);
+      this.debugLog(`Could not fetch model status metadata from models.dev. Applying local unavailable model filter only. ${message}`);
       return uniqueModelIds.filter((modelId) => !KNOWN_UNAVAILABLE_MODEL_IDS.has(modelId));
     }
   }
@@ -2319,6 +2348,7 @@ function getSettings(): ApiSettings {
     maxOutputTokensOverride: config.get("maxTokens", 0),
     maxInputTokensOverride: config.get("maxInputTokens", 0),
     debugReasoning: config.get("debugReasoning", false),
+    debugLogging: config.get("debugLogging", false),
     requestTimeoutMs:
       Math.max(config.get("requestTimeoutSeconds", DEFAULT_REQUEST_TIMEOUT_MS / 1000), 1) * 1000,
     streamIdleTimeoutMs:

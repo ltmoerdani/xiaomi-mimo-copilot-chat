@@ -51,6 +51,7 @@
     "Other"
   ],
   "activationEvents": [
+    "*",
     "onStartupFinished",
     "onCommand:xiaomi-mimo.manage",
     "onCommand:xiaomi-mimo.diagnostics",
@@ -104,6 +105,11 @@
           "type": "boolean",
           "default": false,
           "description": "Write provider reasoning_content to the MiMo output channel for debugging. Reasoning is not shown in Copilot Chat."
+        },
+        "xiaomi-mimo.debugLogging": {
+          "type": "boolean",
+          "default": false,
+          "description": "Write verbose request, response, and model registration diagnostics to the MiMo output channel."
         },
         "xiaomi-mimo.requestTimeoutSeconds": {
           "type": "number",

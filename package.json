@@ -2,7 +2,7 @@
   "name": "xiaomi-mimo-copilot-chat",
   "displayName": "Xiaomi MiMo GitHub Copilot Chat",
   "description": "Bring your own MiMo API key to VS Code Copilot Chat. Adds Xiaomi MiMo models through the Language Model Chat Provider API.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "ltmoerdani",
   "preview": true,
   "license": "MIT",

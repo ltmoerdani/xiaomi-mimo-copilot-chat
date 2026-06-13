@@ -207,13 +207,20 @@ function reportProgressPart(
 // Phase 1: Connection timeout — how long we wait for the initial HTTP response.
 // This is separate from the overall request timeout to fail fast on unreachable servers.
 const CONNECTION_TIMEOUT_MS = 60_000; // 1 minute for initial connection/TTFB
-const MAX_RETRIES = 1; // One automatic retry on transient connection failures
+// Phase 3: First-event timeout — after receiving a 200 OK with text/event-stream
+// but before any SSE data arrives. If the server accepts the request but never
+// sends events, we abort early instead of relying on the stream-idle-timeout
+// (which may not fire if reader.read() doesn't respond to controller.abort()).
+const FIRST_EVENT_TIMEOUT_MS = 90_000; // 1.5 minutes for the first SSE event (shorter than request timeout)
+const MAX_RETRIES = 2; // Up to 2 automatic retries (one for transient, one with pruned body)
 
 async function streamMiMoResponse(
   options: StreamMiMoResponseOptions,
 ): Promise<void> {
   const maxAttempts = (options.maxRetries ?? MAX_RETRIES) + 1;
   let lastError: unknown;
+  let body = options.body;
+  let didPrune = false;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (options.token.isCancellationRequested) {
@@ -221,23 +228,47 @@ async function streamMiMoResponse(
     }
 
     try {
-      await streamMiMoResponseAttempt(options, attempt);
+      await streamMiMoResponseAttempt({ ...options, body }, attempt);
       return;
     } catch (error) {
       lastError = error;
-      // Only retry on connection-level transient errors, not on timeouts or cancellations
+
+      if (options.token.isCancellationRequested) {
+        throw error;
+      }
+
+      // Case 1: Connection-level transient error — retry with same body
       if (
         attempt < maxAttempts - 1
         && isTransientConnectionError(error)
-        && !options.token.isCancellationRequested
       ) {
-        const delayMs = 1000 * (attempt + 1); // linear backoff: 1s, 2s, ...
+        const delayMs = 1000 * (attempt + 1);
         options.output?.appendLine(
           `[retry] attempt ${attempt + 1}/${maxAttempts} failed with transient error, retrying in ${delayMs}ms: ${error instanceof Error ? error.message : String(error)}`,
         );
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
+
+      // Case 2: Server accepted request but sent no data (empty stream / stall)
+      // Retry once with a pruned body (fewer messages) — the server may have
+      // silently dropped the request due to payload size or complexity.
+      if (
+        attempt < maxAttempts - 1
+        && isEmptyStreamTimeout(error)
+        && !didPrune
+      ) {
+        body = pruneRequestBody(body);
+        didPrune = true;
+        const delayMs = 2000; // slightly longer backoff for pruning retry
+        const prunedLabel = body === options.body ? "(body unchanged)" : "(body pruned)";
+        options.output?.appendLine(
+          `[retry] attempt ${attempt + 1}/${maxAttempts} failed with empty stream, retrying ${prunedLabel} in ${delayMs}ms: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
       throw error;
     }
   }
@@ -264,6 +295,68 @@ function isTransientConnectionError(error: unknown): boolean {
   );
 }
 
+/** Detect if the server accepted the HTTP request but never sent meaningful data —
+ * either the stream stalled after starting, or the first SSE event never arrived.
+ * These are candidates for retry with a pruned body. */
+function isEmptyStreamTimeout(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("stream stalled")
+    || message.includes("stream idle")
+    || message.includes("timed out after") && message.includes("during streaming phase")
+  );
+}
+
+/** Reduce the body payload by trimming older messages, keeping the most recent
+ * half plus any system prompt. Handles OpenAI Chat, Anthropic Messages, Google
+ * GenerateContent, and Responses API body shapes.
+ * Returns the original `body` if no pruning was needed. */
+function pruneRequestBody(body: unknown): unknown {
+  if (typeof body !== "object" || body === null) return body;
+
+  const obj: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+  let changed = false;
+
+  // OpenAI Chat / Anthropic Messages format: { messages: [...] }
+  if (Array.isArray(obj.messages) && obj.messages.length > 3) {
+    const msgs = [...obj.messages];
+    const systemMsg = msgs.find(
+      (m) => typeof m === "object" && m !== null && (m as Record<string, unknown>).role === "system",
+    );
+    const nonSystem = msgs.filter(
+      (m) => typeof m !== "object" || m === null || (m as Record<string, unknown>).role !== "system",
+    );
+    const keepCount = Math.max(3, Math.ceil(nonSystem.length / 2));
+    if (keepCount < nonSystem.length) {
+      obj.messages = systemMsg ? [systemMsg, ...nonSystem.slice(-keepCount)] : nonSystem.slice(-keepCount);
+      changed = true;
+    }
+  }
+
+  // Google GenerateContent format: { contents: [...] }
+  if (Array.isArray(obj.contents) && obj.contents.length > 3) {
+    const keepCount = Math.max(3, Math.ceil(obj.contents.length / 2));
+    if (keepCount < obj.contents.length) {
+      obj.contents = obj.contents.slice(-keepCount);
+      changed = true;
+    }
+  }
+
+  // Responses API format: { input: [...] }
+  if (Array.isArray(obj.input) && obj.input.length > 3) {
+    const keepCount = Math.max(3, Math.ceil(obj.input.length / 2));
+    if (keepCount < obj.input.length) {
+      obj.input = obj.input.slice(-keepCount);
+      changed = true;
+    }
+  }
+
+  return changed ? obj : body;
+}
+
 async function streamMiMoResponseAttempt(
   options: StreamMiMoResponseOptions,
   attempt: number,
@@ -281,9 +374,20 @@ async function streamMiMoResponseAttempt(
   let responseStatus: number | undefined;
   let responseContentType: string | undefined;
   let emittedSummary = false;
+  // Hoisted so the abort closure can cancel it directly — in some environments
+  // controller.abort() does not unstick a pending reader.read().
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
+  // Hoisted so the finally block can always clear it.
+  let firstEventTimeout: ReturnType<typeof setTimeout> | undefined;
   const abort = (reason: typeof abortReason) => {
     abortReason ??= reason;
     controller.abort();
+    // Directly cancel the reader as a fallback. In Electron/Node.js fetch,
+    // controller.abort() on an already-received response body sometimes does
+    // not propagate to the stream reader, leaving reader.read() stuck forever.
+    if (reader) {
+      reader.cancel().catch(() => { /* ignore cancel errors */ });
+    }
   };
   const cancellation = options.token.onCancellationRequested(() =>
     abort("cancelled"),
@@ -492,12 +596,20 @@ async function streamMiMoResponseAttempt(
       return;
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let totalBytes = 0;
     let totalEvents = 0;
+    let receivedFirstEvent = false;
     resetStreamIdleTimeout();
+    // Phase 3: First-event timeout — if the server sends 200 OK + text/event-stream
+    // but never emits any SSE data, abort early so the user doesn't wait 5 minutes.
+    // This is separate from stream-idle-timeout which resets on each chunk.
+    firstEventTimeout = setTimeout(
+      () => abort("stream-idle-timeout"),
+      FIRST_EVENT_TIMEOUT_MS,
+    );
 
     while (!options.token.isCancellationRequested) {
       const { value, done } = await reader.read();
@@ -509,6 +621,11 @@ async function streamMiMoResponseAttempt(
       totalBytes += value?.byteLength ?? 0;
       if (firstByteAt === undefined && (value?.byteLength ?? 0) > 0) {
         firstByteAt = Date.now();
+      }
+      // Clear the first-event timeout once any data arrives.
+      if (!receivedFirstEvent) {
+        receivedFirstEvent = true;
+        clearTimeout(firstEventTimeout);
       }
       const chunk = decoder.decode(value, { stream: true });
       if (options.debugReasoning && options.output && chunk) {
@@ -569,7 +686,7 @@ async function streamMiMoResponseAttempt(
         `${options.providerDisplayName} request timed out after ${formatDuration(elapsed)} (during ${phase} phase).`,
         firstByteAt === undefined
           ? `${options.providerDisplayName} did not respond within ${formatDuration(CONNECTION_TIMEOUT_MS)}. The server may be temporarily unavailable. Try again in a moment or switch to a different model.`
-          : `${options.providerDisplayName} started responding but timed out after ${formatDuration(options.requestTimeoutMs)}. Try again later or reduce the request size.`,
+          : `${options.providerDisplayName} started responding but timed out after ${formatDuration(options.requestTimeoutMs)}.`,
       );
       emitSummary(0, 0, {
         abortedReason: "request-timeout",
@@ -580,7 +697,7 @@ async function streamMiMoResponseAttempt(
     if (abortReason === "stream-idle-timeout") {
       const requestError = new MiMoRequestError(
         `${options.providerDisplayName} stream stalled for ${formatDuration(options.streamIdleTimeoutMs)} without new data.`,
-        `${options.providerDisplayName} stopped sending stream data for ${formatDuration(options.streamIdleTimeoutMs)}, so the request was cancelled to avoid leaving Copilot stuck.`,
+        `${options.providerDisplayName} stopped sending stream data for ${formatDuration(options.streamIdleTimeoutMs)}, so the request was cancelled.`,
       );
       emitSummary(0, 0, {
         abortedReason: "stream-idle-timeout",
@@ -597,6 +714,9 @@ async function streamMiMoResponseAttempt(
     clearTimeout(requestTimeout);
     if (streamIdleTimeout) {
       clearTimeout(streamIdleTimeout);
+    }
+    if (firstEventTimeout) {
+      clearTimeout(firstEventTimeout);
     }
     cancellation.dispose();
     if (localRequestId) {

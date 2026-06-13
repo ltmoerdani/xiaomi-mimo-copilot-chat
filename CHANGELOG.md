@@ -4,6 +4,23 @@ All notable changes to the **Xiaomi MiMo Copilot Chat** extension are documented
 
 Forked from [opencode-copilot-chat](https://github.com/ltmoerdani/opencode-copilot-chat).
 
+## [0.1.3] — 2026-06-14
+
+### Fixed
+
+- **Model list fetch errors no longer spam notifications** — when the MiMo API key is invalid/expired (401) or the model list endpoint is unreachable, the error is now silently logged to the **MiMo Output Channel** during background fetches instead of showing a popup every time the chat panel loads.
+- The popup notification is now reserved for **manual refresh only** (via the *Refresh Models* command), so users are still alerted when they explicitly request a refresh.
+- Runtime chat request errors (sent during an actual conversation) are unchanged — they continue to surface immediately as before.
+- **Robust stream abort mechanism** — `abort()` now also calls `reader.cancel()` directly as a fallback. In Electron/Node.js fetch, `controller.abort()` on an already-received response body sometimes does not propagate to the stream reader, leaving `reader.read()` stuck forever. The explicit cancel guarantees the stuck read is unblocked.
+- **First-event timeout (90s)** — a dedicated timer fires when the server returns `200 OK` with `text/event-stream` but never sends any SSE data. This catches the "server accepted the request but silently stalled" case faster than waiting for the stream idle timeout (which may never fire if `reader.read()` is stuck).
+- **Default request timeout reduced from 300s to 120s** — users now wait a maximum of 2 minutes before a failing request surfaces an error, down from 5 minutes.
+- **Removed speculative error messages** — timeout errors no longer claim "this often happens with large conversation context — try continuing in a new chat". They report facts only (duration and phase), avoiding misleading users about the root cause.
+- **Smart retry with body pruning on empty-stream timeout** — when the server accepts a request but sends no data (detected via first-event or stream-idle timeout), the extension automatically retries once with a pruned payload body. Older messages are trimmed (keeping ~50% most recent plus any system prompt), which often resolves silent server drops without requiring the user to manually start a new chat. Compatible with OpenAI Chat, Anthropic Messages, Google GenerateContent, and Responses API body formats.
+
+### Changed
+
+- `DEFAULT_REQUEST_TIMEOUT_MS`: `300000` → `120000` (2 minutes).
+
 ## [0.1.2] — 2026-05-30
 
 ### Fixed

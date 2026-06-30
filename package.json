@@ -43,7 +43,7 @@
   },
   "homepage": "https://github.com/ltmoerdani/xiaomi-mimo-copilot-chat#readme",
   "engines": {
-    "vscode": "^1.118.0"
+    "vscode": "^1.125.0"
   },
   "categories": [
     "AI",

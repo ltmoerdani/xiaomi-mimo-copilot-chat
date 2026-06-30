@@ -50,15 +50,6 @@
     "Programming Languages",
     "Other"
   ],
-  "activationEvents": [
-    "*",
-    "onStartupFinished",
-    "onCommand:xiaomi-mimo.manage",
-    "onCommand:xiaomi-mimo.diagnostics",
-    "onCommand:xiaomi-mimo.setApiKey",
-    "onCommand:xiaomi-mimo.modelPickerDiagnostics",
-    "onLanguageModelChatProvider:xiaomi-mimo"
-  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
